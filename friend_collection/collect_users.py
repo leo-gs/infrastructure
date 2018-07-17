@@ -22,12 +22,12 @@ import pandas as pd
 # In[6]:
 
 
-class JSONFile:
+def convert_json_filename_to_datetime(filename, collection_name):
+    filedate = filename.replace(collection_name, "").replace(".json", "")[:13]
+    filedate = datetime.strptime(filedate, "%Y%m%d_%H%M")
+    return filedate
 
-    def convert_json_filename_to_datetime(filename, collection_name):
-        filedate = filename.replace(collection_name, "").replace(".json", "")[:13]
-        filedate = datetime.strptime(filedate, "%Y%m%d_%H%M")
-        return filedate
+class JSONFile:
 
     def within_interval(self, start_interval, end_interval):
         if start_interval:
@@ -42,8 +42,8 @@ class JSONFile:
 def get_time_window(progress_file, collection_name):
     start_interval = None
     if os.path.isfile(progress_file):
-        progress = json.load(open(progress_file))["last_file_processed"]
-        start_interval = JSONFile.convert_json_filename_to_datetime(progress, collection_name)
+        progress_filename = json.load(open(progress_file))["last_file_processed"]
+        start_interval = JSONFile.convert_json_filename_to_datetime(progress_filename, collection_name)
     
     end_interval = datetime.now().replace(minute=0, second=0, microsecond=0) ## Set the interval end to be at the hour
     

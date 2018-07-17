@@ -32,7 +32,9 @@ def process_users(user_ids, twitter_api, start_interval, end_interval):
 # In[11]:
 
 
+print("collecting user_ids")
 user_ids, start_interval, end_interval = collect_users.run(configuration) ## Returns a set of user_ids, as long as the time window
+user_ids = list(user_ids)
 
 
 # # Get an authenticated API object to start pulling data
@@ -40,13 +42,8 @@ user_ids, start_interval, end_interval = collect_users.run(configuration) ## Ret
 # In[12]:
 
 
+print("getting a Twitter API object")
 twitter_api = functions.get_twitter_api_obj()
-
-
-# In[70]:
-
-
-user_ids = list(user_ids)
 
 
 # # Pull data for each user_id
@@ -72,14 +69,7 @@ while chunk < len(user_ids):
     print(chunk)
     print(str(len(users_data)) + " users collected")
     print(str(len(users_friendships)) + " friendships collected")
-
-
-# In[69]:
-
-
-friends_collected = set([f[0] for f in users_friendships])
-data_collected = set([u[0]["id"] for u in users_data])
-errored = set([e[0] for e in errors])
+    print("")
 
 
 # # Write to the database
@@ -87,7 +77,11 @@ errored = set([e[0] for e in errors])
 # In[56]:
 
 
+print("writing friendships to database")
 pull_friends.write_friendships_to_database(configuration, users_friendships, start_interval, end_interval)
+print("writing errors to database")
 pull_friends.write_errors_to_database(configuration, errors, start_interval, end_interval)
+print("writing user data to database")
 pull_user_data.write_users_to_database(configuration, users_data, start_interval, end_interval)
+print("Done!")
 
