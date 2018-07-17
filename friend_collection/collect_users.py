@@ -37,13 +37,13 @@ class JSONFile:
     
     def __init__(self, filename, collection_name):
         self.filename = filename
-        self.filedate = JSONFile.convert_json_filename_to_datetime(filename, collection_name)
+        self.filedate = convert_json_filename_to_datetime(filename, collection_name)
 
 def get_time_window(progress_file, collection_name):
     start_interval = None
     if os.path.isfile(progress_file):
         progress_filename = json.load(open(progress_file))["last_file_processed"]
-        start_interval = JSONFile.convert_json_filename_to_datetime(progress_filename, collection_name)
+        start_interval = convert_json_filename_to_datetime(progress_filename, collection_name)
     
     end_interval = datetime.now().replace(minute=0, second=0, microsecond=0) ## Set the interval end to be at the hour
     
