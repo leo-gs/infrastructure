@@ -215,8 +215,6 @@ def get_complete_text(tweet):
 
 
 def tweet_matches_parameters(tweet):
-    created_at = get_nested_value(tweet, "created_at")
-    created_ts = datetime.strptime(created_at[0:19]+created_at[25:], "%a %b %d %H:%M:%S %Y")
     
     #######################
     ## Keyword filtering ##
@@ -245,6 +243,9 @@ def tweet_matches_parameters(tweet):
     #############################
     
     if match_dates:
+        created_at = get_nested_value(tweet, "created_at")
+        created_ts = datetime.strptime(created_at[0:19]+created_at[25:], "%a %b %d %H:%M:%S %Y")
+        
         if not created_ts or created_ts < bounds[0] or created_ts > bounds[1]:
             return False
     
@@ -272,13 +273,16 @@ def tweet_matches_parameters(tweet):
 
 
 def extract_tweet(tweet):
-    ## Adding everything to a tuple and inserting the tuple to the database
+    ## Adding everything to a huge tuple and inserting the tuple to the database
+    created_at = get_nested_value(tweet, "created_at")
+    created_ts = datetime.strptime(created_at[0:19]+created_at[25:], "%a %b %d %H:%M:%S %Y")
+    
     ucts = get_nested_value(tweet, "user.created_at")
     user_created_ts = datetime.strptime(ucts[0:19]+ucts[25:], "%a %b %d %H:%M:%S %Y")
 
     item = (
         tweet["id"],
-        tweet["created_at"],
+        created_at,
         created_ts,
         get_nested_value(tweet, "lang"),
         clean(get_nested_value(tweet, "text")),
