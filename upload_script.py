@@ -150,23 +150,23 @@ def get_matching_keywords(search_string, keywords):
 
 
 ## Expanding a URL
-def expand_url(tweet, index=0):
+def expand_url(tweet, index=0, try_num=0):
     
     def expand_url_1(url):
         res = None
         try:
             return urllib2.urlopen(url).url
-        except urllib2.HTTPError as e:
-            return None
-        except urllib2.URLError as e:
-            return None
+        except (urllib2.HTTPError, urllib2.URLError) as e:
+            if try_num < 1:
+                time.sleep(1)
+                return expand_url(url, try_num+1)
+            else:
+                return None
     
     def expand_url_2(url):
         try:
             return requests.get(url).url
-        except requests.exceptions.SSLError as e:
-            return None
-        except requests.exceptions.ConnectionError as e:
+        except (requests.exceptions.SSLError, requests.exceptions.ConnectionError) as e:
             return None
     
     url_json = tweet["entities"].get("urls")
