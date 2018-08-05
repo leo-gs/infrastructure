@@ -37,7 +37,7 @@ INSERT_TWEET_STMT = sql_statements.INSERT_TWEET_STMT
 
 
 search_text = True
-keywords = ["white", "helmet"]
+keywords = ["nato"]
 all_keywords = True
 
 
@@ -51,7 +51,7 @@ all_keywords = True
 # In[ ]:
 
 
-match_dates = True
+match_dates = False
 bounds = (datetime(2017, 5, 27, 0, 0, 0), datetime(2018, 3, 2, 0, 0, 0))
 
 
@@ -75,7 +75,7 @@ reg_expr = "Leo doesn't understand regex"
 # In[ ]:
 
 
-folders = ["/data/captures/Syria composite - Restart 2018/"]
+folders = ["/var/collect/twcap/captures/Disinfo 2/"]
 
 
 # ### Database configuration
@@ -150,37 +150,63 @@ def get_matching_keywords(search_string, keywords):
 
 
 ## Expanding a URL
-def expand_url(tweet, index=0, try_num=0):
+def expand_url(tweet, index=0, try_threshold=1):
     
+    ## Two different ways to try to expand urls
     def expand_url_1(url):
         res = None
         try:
             return urllib2.urlopen(url).url
-        except (urllib2.HTTPError, urllib2.URLError) as e:
-            if try_num < 1:
-                time.sleep(1)
-                return expand_url(url, try_num+1)
-            else:
-                return None
+        except Exception as e:
+            ## Log the exception
+            print("method 1: urllib2.urlopen(url).url")
+            print(url)
+            print(e)
+            print(" ")
+            sys.stdout.flush()
+            return None
     
     def expand_url_2(url):
         try:
             return requests.get(url).url
-        except (requests.exceptions.SSLError, requests.exceptions.ConnectionError) as e:
+        except Exception as e:
+            ## Log the exception
+            print("method 2: return requests.get(url).url")
+            print(url)
+            print(e)
+            print(" ")
+            sys.stdout.flush()
             return None
     
+    ## If the tweet is truncated, we want to use the urls in the extended_tweet field
+    if tweet["truncated"]:
+        tweet = tweet["extended_tweet"]
+    
+    ## Pull out the url at the given index (if it exists - otherwise return None)
     url_json = tweet["entities"].get("urls")
     if not url_json or index >= len(url_json):
         return None
+    url = url_json[index]["expanded_url"]
     
-    url = url_json[index]["url"]
-    if url:
-        url_exp = expand_url_1(url)
-        if not url_exp:
-            url_exp = expand_url_2(url)
-        if not url_exp:
-            print("Couldn't resolve url {}".format(url))
-        return url_exp
+    # If it's a Twitter url, so we dont need to expand it any farther
+    if "https://twitter.com/" in url:
+        return url
+
+    ## Otherwise, try to expand it until we hit the threshold:
+    expanded_url = None
+    for try_ in range(try_threshold):
+        ## Try the first method and return it if it works
+        expanded_url = expand_url_1(url)
+        if expanded_url:
+            return expanded_url
+
+        ## The first method didn't work, so try the second method
+        expanded_url = expand_url_2(url)
+        if expanded_url:
+            return expanded_url
+    
+    ## We weren't successful in expanding it, so just return the original
+    return url
 
 
 # ### Reconstructing full text
@@ -301,7 +327,6 @@ def extract_tweet(tweet):
         get_nested_value_json(tweet, "counts"),
         get_nested_value_json(tweet, "entities"),
         expand_url(tweet, index=0),
-        expand_url(tweet, index=1),
         get_nested_value_json(tweet, "entities.urls"),
         get_nested_value(tweet, "filter_level"),
         get_nested_value_json(tweet, "coordinates"),

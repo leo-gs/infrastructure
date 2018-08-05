@@ -18,7 +18,6 @@ CREATE_TABLE_STMT = """CREATE TABLE iF NOT EXISTS tweets (
   counts json,
   entities json,
   expanded_url_0 TEXT,
-  expanded_url_1 TEXT,
   urls json,
   filter_level varchar(80),
   coordinates json,
@@ -86,7 +85,6 @@ INSERT_TWEET_STMT="""INSERT INTO tweets (
   counts,
   entities,
   expanded_url_0,
-  expanded_url_1,
   urls,
   filter_level,
   coordinates,
@@ -142,7 +140,6 @@ INSERT_TWEET_STMT="""INSERT INTO tweets (
 VALUES 
 
 (
-  %s,
   %s,
   %s,
   %s,
