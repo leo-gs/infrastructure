@@ -158,12 +158,14 @@ def expand_url(tweet, index=0):
             return urllib2.urlopen(url).url
         except urllib2.HTTPError as e:
             return None
+        except urllib2.URLError as e:
+            return None
     
     def expand_url_2(url):
         return requests.get(url).url
     
     url_json = tweet["entities"].get("urls")
-    if not url_json:
+    if not url_json or index >= len(url_json):
         return None
     
     url = url_json[index]["url"]
