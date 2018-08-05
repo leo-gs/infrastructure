@@ -157,17 +157,16 @@ def expand_url(tweet, index=0):
         try:
             return urllib2.urlopen(url).url
         except urllib2.HTTPError as e:
-            print(url)
             return None
         except urllib2.URLError as e:
-            print(url)
             return None
     
     def expand_url_2(url):
         try:
             return requests.get(url).url
         except requests.exceptions.SSLError as e:
-            print(url)
+            return None
+        except requests.exceptions.ConnectionError as e:
             return None
     
     url_json = tweet["entities"].get("urls")
@@ -179,6 +178,8 @@ def expand_url(tweet, index=0):
         url_exp = expand_url_1(url)
         if not url_exp:
             url_exp = expand_url_2(url)
+        if not url_exp:
+            print("Couldn't resolve url {}".format(url))
         return url_exp
 
 
@@ -201,7 +202,6 @@ def get_complete_text(tweet):
 
     # this handles retweets of original tweets and retweets of quoted tweets
     if "retweeted_status" in tweet:
-        print("is retweet")
         return "RT @{username}: {orig_complete_text}".format(
             username=c(tweet["retweeted_status"]["user"]["screen_name"]),
             orig_complete_text=get_complete_text(tweet["retweeted_status"]))
