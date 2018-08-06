@@ -380,10 +380,10 @@ def extract_tweet(tweet):
 
 
 def extract_json_file(json_file_path, cursor, database, keywords):
-    queue = []
-
     with open(json_file_path, 'r') as infile:
+        queue = []
         lines = [line for line in infile if (line and len(line) < 2)]
+
         for line in lines:
             tweet = None
 
@@ -405,11 +405,11 @@ def extract_json_file(json_file_path, cursor, database, keywords):
                 print(line)
                 return
         
-    ## Insert all the extracted tweets into the database
-    ext.execute_batch(cursor, INSERT_TWEET_STMT, queue)
+        ## Insert all the extracted tweets into the database
+        ext.execute_batch(cursor, INSERT_TWEET_STMT, queue)
 
-    ## Just to keep track of how many have been inserted
-    return len(queue)
+        ## Just to keep track of how many have been inserted
+        return len(queue)
 
 
 # # 3. Run everything
