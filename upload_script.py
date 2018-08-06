@@ -22,8 +22,6 @@ import sql_statements
 CREATE_TABLE_STMT = sql_statements.CREATE_TABLE_STMT
 INSERT_TWEET_STMT = sql_statements.INSERT_TWEET_STMT
 
-lock = mp.Lock() ## For processing multiple tweets at once
-
 
 # # 1. Configure parameters
 
@@ -41,7 +39,7 @@ lock = mp.Lock() ## For processing multiple tweets at once
 
 search_text = True
 keywords = ["nato"]
-all_keywords = True
+all_keywords = False
 
 
 # ### Date bounds
@@ -97,8 +95,8 @@ folders = ["/var/collect/twcap/captures/Disinfo 2/"]
 # In[11]:
 
 
-database_name = "syria_composite_white_helmets"
-db_config_file = "/home/lgs17/config/bowker_config.txt"
+database_name = "disinfo_2_nato"
+db_config_file = "/home/lgs17/bowker_config.txt"
 
 
 # # 2. Functions
@@ -148,10 +146,11 @@ def get_nested_value_json(_dict, path, default=None):
 
 ## Given a string and a list of keywords, returns all keywords that exist in the string (case-insensitive)
 ## To check for any matches, just see if there are things in the list
-def get_matching_keywords(search_string, keywords):
+def get_matching_keywords(search_string):
     return [keyword for keyword in keywords if keyword in search_string.lower()]
 
 
+known_urls = {}
 ## Expanding a URL
 def expand_url(tweet, index=0, try_threshold=1):
     
@@ -179,10 +178,14 @@ def expand_url(tweet, index=0, try_threshold=1):
         return None
     url = url_json[index]["expanded_url"]
     
-    # If it's a Twitter url, so we dont need to expand it any farther
+    ## If it's a Twitter url, so we dont need to expand it any farther
     if "https://twitter.com/" in url:
         return url
-
+    
+    ## If we've already looked it up, use that result
+    if url in known_urls:
+        return known_urls[url]
+    
     ## Otherwise, try the first method and return it if it works
     expanded_url = expand_url_1(url)
     if expanded_url:
@@ -194,7 +197,9 @@ def expand_url(tweet, index=0, try_threshold=1):
         return expanded_url
     
     ## We weren't successful in expanding it, so just return the original
-    return url
+    expanded_url = url
+    known_urls[url] = expanded_url
+    return expanded_url
 
 
 # ### Reconstructing full text
@@ -253,10 +258,10 @@ def matches_parameters(tweet):
                 return bool(matches) ## return True if there's at least one match
 
 
-        ## Make a list of fields to check for keyword matches
+        ## Make a list of fields to check for keyword matches (could add user_description, etc.)
         keyword_texts = [get_complete_text(tweet)]
 
-        keywords_matches = [matches_keywords(text, keywords) for text in keyword_texts]
+        keyword_matches = [matches_keywords(keyword_text) for keyword_text in keyword_texts]
         if not any(keyword_matches):
             return False
 
@@ -378,9 +383,8 @@ def extract_json_file(json_file_path, cursor, database, keywords):
     queue = []
 
     with open(json_file_path, 'r') as infile:
-        lines = [line for line in infile if (not line or len(line) < 2)]
-        
-        def process_line(line):
+        lines = [line for line in infile if (line and len(line) < 2)]
+        for line in lines:
             tweet = None
 
             ## Load the tweet string into a dictionary.
@@ -394,35 +398,13 @@ def extract_json_file(json_file_path, cursor, database, keywords):
                     tweet_row = extract_tweet(tweet)
                     
                     if tweet_row:
-                        lock.acquire() ## since it's running in parallel
                         queue.append(tweet_row)
-                        lock.release()
             
             except ValueError:
                 print("bad json")
                 print(line)
                 return
         
-        ## Do stuff in parallel chunks to make it faster
-        chunk_size = mp.cpu_count()
-        index = 0
-        
-        while index < len(lines):
-            processes = []
-            chunk = lines[index : chunk_size]
-            
-            for line in chunk:
-                p = Process(target=process_line, args=(line,))
-                p.start()
-                processes.append(p)
-        
-            for p in process:
-                p.join()
-            
-            index = index + chunk_size
-            
-        print(len(queue))
-            
     ## Insert all the extracted tweets into the database
     ext.execute_batch(cursor, INSERT_TWEET_STMT, queue)
 
