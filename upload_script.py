@@ -161,24 +161,12 @@ def expand_url(tweet, index=0, try_threshold=1):
         try:
             return urllib2.urlopen(url).url
         except Exception as e:
-            ## Log the exception
-            print("method 1: urllib2.urlopen(url).url")
-            print(url)
-            print(e)
-            print(" ")
-            sys.stdout.flush()
             return None
     
     def expand_url_2(url):
         try:
             return requests.get(url).url
         except Exception as e:
-            ## Log the exception
-            print("method 2: return requests.get(url).url")
-            print(url)
-            print(e)
-            print(" ")
-            sys.stdout.flush()
             return None
     
     ## If the tweet is truncated, we want to use the urls in the extended_tweet field
@@ -413,13 +401,26 @@ def extract_json_file(json_file_path, cursor, database, keywords):
             except ValueError:
                 print("bad json")
                 print(line)
-                continue
-        ## Do stuff in parallel to make it faster
-        pool = mp.Pool()
-        for line in lines:
-            pool.apply_async(process_line, args = (line,))
-        pool.close()
-        pool.join()
+                return
+        
+        ## Do stuff in parallel chunks to make it faster
+        chunk_size = mp.cpu_count()
+        index = 0
+        
+        while index < len(lines):
+            processes = []
+            chunk = lines[index : chunk_size]
+            
+            for line in chunk:
+                p = Process(target=process_line, args=(line,))
+                p.start()
+                processes.append(p)
+        
+            for p in process:
+                p.join()
+            
+            index = index + chunk_size
+            
         print(len(queue))
             
     ## Insert all the extracted tweets into the database
