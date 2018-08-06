@@ -1,12 +1,13 @@
 
 # coding: utf-8
 
-# In[ ]:
+# In[4]:
 
 
 import csv
 from datetime import datetime
 import json
+import multiprocessing as mp
 import os
 import psycopg2
 from psycopg2 import extras as ext
@@ -19,7 +20,9 @@ import urllib2
 import sql_statements
 
 CREATE_TABLE_STMT = sql_statements.CREATE_TABLE_STMT
-INSERT_TWEET_STMT = sql_statements.INSERT_TWEET_STMT 
+INSERT_TWEET_STMT = sql_statements.INSERT_TWEET_STMT
+
+lock = mp.Lock() ## For processing multiple tweets at once
 
 
 # # 1. Configure parameters
@@ -192,18 +195,15 @@ def expand_url(tweet, index=0, try_threshold=1):
     if "https://twitter.com/" in url:
         return url
 
-    ## Otherwise, try to expand it until we hit the threshold:
-    expanded_url = None
-    for try_ in range(try_threshold):
-        ## Try the first method and return it if it works
-        expanded_url = expand_url_1(url)
-        if expanded_url:
-            return expanded_url
+    ## Otherwise, try the first method and return it if it works
+    expanded_url = expand_url_1(url)
+    if expanded_url:
+        return expanded_url
 
-        ## The first method didn't work, so try the second method
-        expanded_url = expand_url_2(url)
-        if expanded_url:
-            return expanded_url
+    ## The first method didn't work, so try the second method
+    expanded_url = expand_url_2(url)
+    if expanded_url:
+        return expanded_url
     
     ## We weren't successful in expanding it, so just return the original
     return url
@@ -248,7 +248,7 @@ def get_complete_text(tweet):
 # In[21]:
 
 
-def tweet_matches_parameters(tweet):
+def matches_parameters(tweet):
     
     #######################
     ## Keyword filtering ##
@@ -390,11 +390,9 @@ def extract_json_file(json_file_path, cursor, database, keywords):
     queue = []
 
     with open(json_file_path, 'r') as infile:
-        for line in infile:
-            ## Skip empty lines
-            if (not line or len(line) < 2):
-                continue  
-
+        lines = [line for line in infile if (not line or len(line) < 2)]
+        
+        def process_line(line):
             tweet = None
 
             ## Load the tweet string into a dictionary.
@@ -402,20 +400,29 @@ def extract_json_file(json_file_path, cursor, database, keywords):
             ## it. If there end up being a lot, we should probably figure out why that's happening.
             try:
                 tweet = json.loads(line)
+                
+                ## Make sure that the tweet matches all filtering parameters
+                if matches_parameters(tweet):
+                    tweet_row = extract_tweet(tweet)
+                    
+                    if tweet_row:
+                        lock.acquire() ## since it's running in parallel
+                        queue.append(tweet_row)
+                        lock.release()
+            
             except ValueError:
                 print("bad json")
                 print(line)
                 continue
-
-            ## Make sure that the tweet matches all filtering parameters
-            if not tweet_matches_parameters:
-                continue
-
-            tweet_row = extract_tweet(tweet)
-            if tweet_row:
-                queue.append(tweet_row)
-
-    ## Insert the extracted tweets into the database
+        ## Do stuff in parallel to make it faster
+        pool = mp.Pool()
+        for line in lines:
+            pool.apply_async(process_line, args = (line,))
+        pool.close()
+        pool.join()
+        print(len(queue))
+            
+    ## Insert all the extracted tweets into the database
     ext.execute_batch(cursor, INSERT_TWEET_STMT, queue)
 
     ## Just to keep track of how many have been inserted
