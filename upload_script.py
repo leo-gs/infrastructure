@@ -38,7 +38,7 @@ INSERT_TWEET_STMT = sql_statements.INSERT_TWEET_STMT
 
 
 search_text = True
-keywords = ["nato"]
+keywords = ["keyword_1", "keyword_2"]
 all_keywords = False
 
 
@@ -76,7 +76,7 @@ reg_expr = "Leo doesn't understand regex"
 # In[ ]:
 
 
-folders = ["/var/collect/twcap/captures/Disinfo 2/"]
+folders = ["json_folder_1", "json_folder_2"]
 
 
 # ### Database configuration
@@ -95,8 +95,8 @@ folders = ["/var/collect/twcap/captures/Disinfo 2/"]
 # In[11]:
 
 
-database_name = "disinfo_2_nato"
-db_config_file = "/home/lgs17/bowker_config.txt"
+database_name = "database_name"
+db_config_file = "database_configuration"
 
 
 # # 2. Functions
@@ -149,57 +149,6 @@ def get_nested_value_json(_dict, path, default=None):
 def get_matching_keywords(search_string):
     return [keyword for keyword in keywords if keyword in search_string.lower()]
 
-
-known_urls = {}
-## Expanding a URL
-def expand_url(tweet, index=0, try_threshold=1):
-    
-    ## Two different ways to try to expand urls
-    def expand_url_1(url):
-        res = None
-        try:
-            return urllib2.urlopen(url).url
-        except Exception as e:
-            return None
-    
-    def expand_url_2(url):
-        try:
-            return requests.get(url).url
-        except Exception as e:
-            return None
-    
-    ## If the tweet is truncated, we want to use the urls in the extended_tweet field
-    if tweet["truncated"]:
-        tweet = tweet["extended_tweet"]
-    
-    ## Pull out the url at the given index (if it exists - otherwise return None)
-    url_json = tweet["entities"].get("urls")
-    if not url_json or index >= len(url_json):
-        return None
-    url = url_json[index]["expanded_url"]
-    
-    ## If it's a Twitter url, so we dont need to expand it any farther
-    if "https://twitter.com/" in url:
-        return url
-    
-    ## If we've already looked it up, use that result
-    if url in known_urls:
-        return known_urls[url]
-    
-    ## Otherwise, try the first method and return it if it works
-    expanded_url = expand_url_1(url)
-    if expanded_url:
-        return expanded_url
-
-    ## The first method didn't work, so try the second method
-    expanded_url = expand_url_2(url)
-    if expanded_url:
-        return expanded_url
-    
-    ## We weren't successful in expanding it, so just return the original
-    expanded_url = url
-    known_urls[url] = expanded_url
-    return expanded_url
 
 
 # ### Reconstructing full text
@@ -276,8 +225,6 @@ def matches_parameters(tweet):
         if not created_ts or created_ts < bounds[0] or created_ts > bounds[1]:
             return False
     
-    return True
-
     ####################
     ## Regex matching ##
     ####################
@@ -306,42 +253,53 @@ def extract_tweet(tweet):
     
     ucts = get_nested_value(tweet, "user.created_at")
     user_created_ts = datetime.strptime(ucts[0:19]+ucts[25:], "%a %b %d %H:%M:%S %Y")
-
+    
+    entities = tweet["entities"]
+    if tweet["truncated"]:
+        entities = tweet["extended_tweet"]["entities"]
+    elif "retweeted_status" in tweet:
+        if tweet["retweeted_status"]["truncated"]:
+            entities = tweet["retweeted_status"]["extended_tweet"]["entities"]
+        else:
+            entities = tweet["retweeted_status"]["entities"]
+    
+    first_url = clean(get_nested_value(entities, "urls{0}.expanded_url"))
+    
     item = (
         tweet["id"],
-        created_at,
+        clean(created_at),
         created_ts,
-        get_nested_value(tweet, "lang"),
+        clean(get_nested_value(tweet, "lang")),
         clean(get_nested_value(tweet, "text")),
         clean(get_complete_text(tweet)),
-        get_nested_value(tweet, "coordinates.coordinates{0}"),
-        get_nested_value(tweet, "coordinates.coordinates{1}"),
-        get_nested_value_json(tweet, "contributors"),
-        get_nested_value_json(tweet, "counts"),
-        get_nested_value_json(tweet, "entities"),
-        expand_url(tweet, index=0),
-        get_nested_value_json(tweet, "entities.urls"),
-        get_nested_value(tweet, "filter_level"),
-        get_nested_value_json(tweet, "coordinates"),
-        get_nested_value_json(tweet, "place"),
+        clean(get_nested_value(tweet, "coordinates.coordinates{0}")),
+        clean(get_nested_value(tweet, "coordinates.coordinates{1}")),
+        clean(get_nested_value_json(tweet, "contributors")),
+        clean(get_nested_value_json(tweet, "counts")),
+        clean(json.dumps(entities)),
+        first_url,
+        clean(get_nested_value_json(entities, "urls")),
+        clean(get_nested_value(tweet, "filter_level")),
+        clean(get_nested_value_json(tweet, "coordinates")),
+        clean(get_nested_value_json(tweet, "place")),
         get_nested_value(tweet, "possibly_sensitive"),
-        get_nested_value_json(tweet, "user"),
+        clean(get_nested_value_json(tweet, "user")),
         get_nested_value(tweet, "user.id"),
-        get_nested_value(tweet, "user.screen_name"),
+        clean(get_nested_value(tweet, "user.screen_name")),
         get_nested_value(tweet, "user.followers_count"),
         get_nested_value(tweet, "user.friends_count"),
         get_nested_value(tweet, "user.statuses_count"),
         get_nested_value(tweet, "user.favourites_count"),
         get_nested_value(tweet, "user.geo_enabled"),
-        get_nested_value(tweet, "user.time_zone"),
+        clean(get_nested_value(tweet, "user.time_zone")),
         clean(get_nested_value(tweet, "user.description")),
-        get_nested_value(tweet, "user.location"),
-        get_nested_value(tweet, "user.created_at"),
+        clean(get_nested_value(tweet, "user.location")),
+        clean(get_nested_value(tweet, "user.created_at")),
         user_created_ts,
-        get_nested_value(tweet, "user.lang"),
+        clean(get_nested_value(tweet, "user.lang")),
         get_nested_value(tweet, "user.listed_count"),
-        get_nested_value(tweet, "user.name"),
-        get_nested_value(tweet, "user.url"),
+        clean(get_nested_value(tweet, "user.name")),
+        clean(get_nested_value(tweet, "user.url")),
         get_nested_value(tweet, "user.utc_offset"),
         get_nested_value(tweet, "user.verified"),
         get_nested_value(tweet, "user.contributors_enabled"),
@@ -349,27 +307,27 @@ def extract_tweet(tweet):
         get_nested_value(tweet, "user.is_translator"),
         get_nested_value(tweet, "retweet_count"),
         get_nested_value(tweet, "favorite_count"),
-        get_nested_value_json(tweet, "retweeted_status"),
+        clean(get_nested_value_json(tweet, "retweeted_status")),
         get_nested_value(tweet, "retweeted_status.id"),
-        get_nested_value(tweet, "retweeted_status.user.screen_name"),
+        clean(get_nested_value(tweet, "retweeted_status.user.screen_name")),
         get_nested_value(tweet, "retweeted_status.retweet_count"),
         get_nested_value(tweet, "retweeted_status.user.id"),
-        get_nested_value(tweet, "retweeted_status.user.time_zone"),
+        clean(get_nested_value(tweet, "retweeted_status.user.time_zone")),
         get_nested_value(tweet, "retweeted_status.user.friends_count"),
         get_nested_value(tweet, "retweeted_status.user.statuses_count"),
         get_nested_value(tweet, "retweeted_status.user.followers_count"),
-        get_nested_value(tweet, "source"),
-        get_nested_value(tweet, "in_reply_to_screen_name"),
+        clean(get_nested_value(tweet, "source")),
+        clean(get_nested_value(tweet, "in_reply_to_screen_name")),
         get_nested_value(tweet, "in_reply_to_status_id"),
         get_nested_value(tweet, "in_reply_to_user_id"),
         get_nested_value(tweet, "quoted_status_id"),
-        get_nested_value(tweet, "quoted_status_id_str"),
-        get_nested_value_json(tweet, "quoted_status"),
+        clean(get_nested_value(tweet, "quoted_status_id_str")),
+        clean(get_nested_value_json(tweet, "quoted_status")),
         get_nested_value(tweet, "truncated"),
-        get_nested_value(tweet, "quoted_status.user.screen_name"),
+        clean(get_nested_value(tweet, "quoted_status.user.screen_name")),
         clean(get_nested_value(tweet, "retweeted_status.user.description")),
         clean(get_nested_value(tweet, "quoted_status.user.description")),
-        json.dumps(tweet))
+        clean(json.dumps(tweet)))
   
     return item
 
@@ -403,10 +361,10 @@ def extract_json_file(json_file_path, cursor, database, keywords):
             except ValueError:
                 print("bad json")
                 print(line)
-        
+            
         ## Insert all the extracted tweets into the database
         ext.execute_batch(cursor, INSERT_TWEET_STMT, queue)
-
+        
         ## Just to keep track of how many have been inserted
         return len(queue)
 
@@ -426,11 +384,10 @@ for line in open(db_config_file).readlines():
 database = psycopg2.connect(**config)
 cursor = database.cursor()
 
+cursor.execute("DROP TABLE IF EXISTS tweets;")
+
 cursor.execute(CREATE_TABLE_STMT)
 database.commit()
-
-## Uncomment to clear the table each time the script starts
-cursor.execute("DELETE FROM tweets")
 
 ## Keep track of how many tweets have been inserted (just make sure it's running)
 total = 0
