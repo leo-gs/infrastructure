@@ -147,7 +147,7 @@ def get_nested_value_json(_dict, path, default=None):
 
 ## Given a string and a list of keywords, returns all keywords such that \bkeyword or keyword\b is true
 ## To check for any matches, just see if there are things in the returned list
-def get_matching_keywords(search_string, keywords):
+def get_matching_keywords(search_string):
     keyword_regex = r"(\b({reg}))|(({reg})\b)".format(reg="|".join(keywords))
     matches = []
     for match in re.findall(keyword_regex, search_string.lower()):
