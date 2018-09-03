@@ -268,8 +268,10 @@ def extract_tweet(tweet):
             entities = tweet["retweeted_status"]["extended_tweet"]["entities"]
         else:
             entities = tweet["retweeted_status"]["entities"]
-    
-    first_url = clean(get_nested_value(entities, "urls{0}.expanded_url"))
+
+    u = clean(get_nested_value(entities, "urls.0.expanded_url"))
+    if u:
+    	print(u)
     
     item = (
         tweet["id"],
@@ -278,12 +280,12 @@ def extract_tweet(tweet):
         clean(get_nested_value(tweet, "lang")),
         clean(get_nested_value(tweet, "text")),
         clean(get_complete_text(tweet)),
-        clean(get_nested_value(tweet, "coordinates.coordinates{0}")),
-        clean(get_nested_value(tweet, "coordinates.coordinates{1}")),
+        clean(get_nested_value(tweet, "coordinates.coordinates.0")),
+        clean(get_nested_value(tweet, "coordinates.coordinates.1")),
         clean(get_nested_value_json(tweet, "contributors")),
         clean(get_nested_value_json(tweet, "counts")),
         clean(json.dumps(entities)),
-        first_url,
+        clean(get_nested_value(entities, "urls.0.expanded_url")),
         clean(get_nested_value_json(entities, "urls")),
         clean(get_nested_value(tweet, "filter_level")),
         clean(get_nested_value_json(tweet, "coordinates")),
