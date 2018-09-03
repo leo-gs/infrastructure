@@ -270,8 +270,6 @@ def extract_tweet(tweet):
             entities = tweet["retweeted_status"]["entities"]
 
     u = clean(get_nested_value(entities, "urls.0.expanded_url"))
-    if u:
-    	print(u)
     
     item = (
         tweet["id"],
