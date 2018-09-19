@@ -17,8 +17,8 @@ import time
 
 import sql_statements
 
-CREATE_TABLE_STMT = "CREATE TABLE expanded_url_map(expanded_url_0 TEXT, resolved_url TEXT);"
-INSERT_TWEET_STMT = "INSERT INTO expanded_url_map (expanded_url_0, resolved_url) VALUES (%s, %s);"
+CREATE_TABLE_STMT = "CREATE TABLE expanded_url_map(expanded_url_0 TEXT, resolved_url TEXT, domain TEXT);"
+INSERT_TWEET_STMT = "INSERT INTO expanded_url_map (expanded_url_0, resolved_url, domain) VALUES (%s, %s, %s);"
 
 
 database_name = "disinfo_2_qanon"
@@ -51,7 +51,7 @@ Logic:
         we assume short_url has already been completely expanded and return short_url
 (4) otherwise set short_url <- expanded_url and repeat from beginning
 '''
-def expand_url(short_url, url_timeout=None, domain_equivalence=False):
+def expand_url(orig_url, short_url, url_timeout=None, domain_equivalence=False):
     short_domain = get_domain(short_url)
     if short_domain == "twitter.com":
         return (short_url, short_domain)
@@ -64,29 +64,27 @@ def expand_url(short_url, url_timeout=None, domain_equivalence=False):
         expanded_url = response.headers["location"]
     else:
         expanded_url = short_url
-    # except:
-    #     print(short_url)
 
     ## We weren't able to expand the URL, so the URL is broken
     if not expanded_url:
-        return (None, short_domain)
+        return (orig_url, None, None)
 
     expanded_domain = get_domain(expanded_url)
 
     ## The expanded_url isn't valid
     if not expanded_domain:
-        return (None, short_domain)
+        return (orig_url, None, None)
 
     ## Expanding the URL took us to the same domain, so it was already completely expanded
     if domain_equivalence:
         if short_domain == expanded_domain:
-            return (short_url, short_domain)
+            return (orig_url, short_url, short_domain)
     else:
         if short_url == expanded_url:
-            return (short_url, short_domain)
+            return (orig_url, short_url, short_domain)
     
     ## Otherwise, following the URL took us to a new URL or domain so start again with the new URL to see if there's more expansion to do
-    return expand_url(expanded_url)
+    return expand_url(orig_url, expanded_url, url_timeout=url_timeout, domain_equivalence=domain_equivalence)
 
 
 ########################
@@ -168,9 +166,35 @@ pool.close()
 pool.join()
 
 
-## Compile all URL chunks into one big file
+#################################################
+## 4. Compile all URL chunks into one big file ##
+#################################################
 
-## Then load into database
+## Make sure we've got them all
+for chunk_index in url_chunks:
+    assert os.path.isfile("cache/{}.json".format(chunk_index)), "No file exists for chunk {}".format(chunk_index)
+
+## Compile all URL chunks into one big file
+compiled_urls = []
+for chunk_index in url_chunks:
+    fname = "cache/{}.json".format(chunk_index)
+    with open(fname) as f:
+        chunk_urls = json.load(fname)
+        compiled_urls.extend(chunk_urls)
+
+
+###############################
+## 5. Load into the database ##
+###############################
+
+database, cursor = open_connection()
+ext.execute_batch(cursor, INSERT_TWEET_STMT, compiled_urls)
+close_connection(database, cursor)
+
+
+##############
+## 6. Done! ##
+##############
 
 print("Done")
 
