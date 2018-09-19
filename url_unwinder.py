@@ -51,20 +51,20 @@ Logic:
         we assume short_url has already been completely expanded and return short_url
 (4) otherwise set short_url <- expanded_url and repeat from beginning
 '''
-def expand_url(orig_url, short_url, url_timeout=None, domain_equivalence=False):
+def expand_url(orig_url, short_url, url_timeout=60, domain_equivalence=False):
+    
     short_domain = get_domain(short_url)
     if short_domain == "twitter.com":
         return (short_url, short_domain)
 
     expanded_url = None
-    # try:
-
     response = requests.head(short_url, timeout=url_timeout)
+    
     if response.is_redirect:
         expanded_url = response.headers["location"]
     else:
         expanded_url = short_url
-
+    
     ## We weren't able to expand the URL, so the URL is broken
     if not expanded_url:
         return (orig_url, None, None)
@@ -75,7 +75,7 @@ def expand_url(orig_url, short_url, url_timeout=None, domain_equivalence=False):
     if not expanded_domain:
         return (orig_url, None, None)
 
-    ## Expanding the URL took us to the same domain, so it was already completely expanded
+    ## Expanding the URL took us to the same place, so it was already completely expanded
     if domain_equivalence:
         if short_domain == expanded_domain:
             return (orig_url, short_url, short_domain)
@@ -113,16 +113,16 @@ def close_connection(database, cursor):
 
 short_urls = []
 
-## If there's no cached file, pull them from the database
-## Note: it's important that the URLs remain in the same order, which is why they're also sorted
+# If there's no cached file, pull them from the database
+# Note: it's important that the URLs remain in the same order, which is why they're also sorted
 if not os.path.isfile("cache/distinct_urls_" + database_name + ".json"):
     database, cursor = open_connection()
     cursor.execute("SELECT DISTINCT expanded_url_0 FROM tweets WHERE expanded_url_0 IS NOT NULL")
     short_urls = sorted([u[0] for u in cursor.fetchall()])
+    close_connection(database, cursor)
 
     with open("cache/distinct_urls_" + database_name + ".json", "w+") as f:
         json.dump(short_urls, f)
-    close_connection(database, cursor)
 
 ## Otherwise we have a cached file of URLs already, so we can just use that
 else:
@@ -154,34 +154,37 @@ def process_chunk(chunk):
 
     ## Only expand the URLs if we haven't already expanded and cached them
     if not os.path.isfile("cache/{}.json".format(chunk_index)):
-        expanded_urls = [expand_url(short_url, url_timeout=60) for short_url in urls_to_expand]
+
+        expanded_urls = [expand_url(short_url, short_url, url_timeout=60) for short_url in urls_to_expand]
 
         ## Cache the chunk so if something goes wrong later we don't have to expand everything again
-        with open("cache/{}.json".format(chunk_index)) as f:
+        with open("cache/{}.json".format(chunk_index), "w+") as f:
             json.dump(expanded_urls, f)
 
 pool = mp.Pool()
-_ = pool.map_async(proces_chunk, url_chunks)
+_ = pool.map_async(process_chunk, url_chunks)
 pool.close()
 pool.join()
 
 
-#################################################
-## 4. Compile all URL chunks into one big file ##
-#################################################
+###############################
+## 4. Compile all URL chunks ##
+###############################
 
-## Make sure we've got them all
-for chunk_index in url_chunks:
-    assert os.path.isfile("cache/{}.json".format(chunk_index)), "No file exists for chunk {}".format(chunk_index)
+# Make sure we've got them all
+# for chunk_index in url_chunks:
+#     assert os.path.isfile("cache/{}.json".format(chunk_index)), "No file exists for chunk {}".format(chunk_index)
 
 ## Compile all URL chunks into one big file
 compiled_urls = []
-for chunk_index in url_chunks:
+for chunk_index, _ in url_chunks:
     fname = "cache/{}.json".format(chunk_index)
     with open(fname) as f:
-        chunk_urls = json.load(fname)
+        chunk_urls = json.load(f)
         compiled_urls.extend(chunk_urls)
-
+print(len(short_urls))
+print(len(compiled_urls))
+print(compiled_urls)
 
 ###############################
 ## 5. Load into the database ##
