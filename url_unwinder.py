@@ -22,7 +22,7 @@ INSERT_TWEET_STMT = "INSERT INTO expanded_url_map (expanded_url_0, resolved_url,
 
 
 database_name = "disinfo_2_qanon"
-db_config_file = "/home/lgs17/bowker_config.txt"
+db_config_file = "bowker_config.txt"
 
 
 if not os.path.isdir("cache"):
@@ -50,20 +50,32 @@ Logic:
 (3) if expanded_url is a valid URL and but isn't a redirect or expanded_url == short_url
         we assume short_url has already been completely expanded and return short_url
 (4) otherwise set short_url <- expanded_url and repeat from beginning
+
+Returns: (original_url, expanded_url (or None), expanded_domain (or None))
 '''
 def expand_url(orig_url, short_url, url_timeout=60, domain_equivalence=False):
     
     short_domain = get_domain(short_url)
     if short_domain == "twitter.com":
-        return (short_url, short_domain)
+        return (short_url, short_url, short_domain)
 
     expanded_url = None
-    response = requests.head(short_url, timeout=url_timeout)
-    
-    if response.is_redirect:
-        expanded_url = response.headers["location"]
-    else:
-        expanded_url = short_url
+    try:
+        response = requests.head(short_url, timeout=url_timeout)
+        if response.is_redirect:
+            expanded_url = response.headers["location"]
+        else:
+            expanded_url = short_url
+
+    except requests.exceptions.ConnectionError:
+        print("connection error: {}".format(short_url))
+        return (orig_url, None, None)
+
+    except Exception as ex:
+        template = "An exception of type {0} occurred. Arguments:\n{1!r}"
+        message = template.format(type(ex).__name__, ex.args)
+        print(message)
+        return (orig_url, None, None)
     
     ## We weren't able to expand the URL, so the URL is broken
     if not expanded_url:
@@ -126,7 +138,7 @@ if not os.path.isfile("cache/distinct_urls_" + database_name + ".json"):
 
 ## Otherwise we have a cached file of URLs already, so we can just use that
 else:
-    with open("cache/distinct_urls_" + database_name + ".json", "w+") as f:
+    with open("cache/distinct_urls_" + database_name + ".json") as f:
         short_urls = json.load(f)
 
 
@@ -137,9 +149,14 @@ else:
 chunk_size = 1000 ## how many URLs per chunk - can be adjusted
 url_chunks = []
 
+## delete this!
+chunk_size = 10
+short_urls = short_urls[:500]
+
 index = 0
 while index < len(short_urls):
-    chunk = (index, short_urls[index : (index + chunk_size)])
+    chunk_id = index // chunk_size
+    chunk = (chunk_id, short_urls[index : (index + chunk_size)])
     url_chunks.append(chunk)
     index = index + chunk_size
 
@@ -149,17 +166,18 @@ while index < len(short_urls):
 ###################################################################################
 
 def process_chunk(chunk):
-    chunk_index, urls_to_expand = chunk
-    print("Processing chunk {}".format(chunk_index), flush=True)
+    chunk_id, urls_to_expand = chunk
+    print("{}/{}".format(chunk_id, len(url_chunks)))
 
     ## Only expand the URLs if we haven't already expanded and cached them
-    if not os.path.isfile("cache/{}.json".format(chunk_index)):
+    if not os.path.isfile("cache/{}.json".format(chunk_id)):
 
         expanded_urls = [expand_url(short_url, short_url, url_timeout=60) for short_url in urls_to_expand]
 
         ## Cache the chunk so if something goes wrong later we don't have to expand everything again
-        with open("cache/{}.json".format(chunk_index), "w+") as f:
+        with open("cache/{}.json".format(chunk_id), "w+") as f:
             json.dump(expanded_urls, f)
+
 
 pool = mp.Pool()
 _ = pool.map_async(process_chunk, url_chunks)
@@ -172,19 +190,17 @@ pool.join()
 ###############################
 
 # Make sure we've got them all
-# for chunk_index in url_chunks:
-#     assert os.path.isfile("cache/{}.json".format(chunk_index)), "No file exists for chunk {}".format(chunk_index)
+for chunk_id, _ in url_chunks:
+    assert os.path.isfile("cache/{}.json".format(chunk_id)), "No file exists for chunk {}".format(chunk_id)
 
 ## Compile all URL chunks into one big file
 compiled_urls = []
-for chunk_index, _ in url_chunks:
-    fname = "cache/{}.json".format(chunk_index)
+for chunk_id, _ in url_chunks:
+    fname = "cache/{}.json".format(chunk_id)
     with open(fname) as f:
         chunk_urls = json.load(f)
         compiled_urls.extend(chunk_urls)
-print(len(short_urls))
-print(len(compiled_urls))
-print(compiled_urls)
+
 
 ###############################
 ## 5. Load into the database ##
