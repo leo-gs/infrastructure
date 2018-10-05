@@ -21,8 +21,8 @@ import sql_statements
 UPDATE_STMT = "UPDATE expanded_url_map SET resolved_url = %s, domain = %s WHERE expanded_url_0 = %s;"
 
 
-database_name = "disinfo_2_qanon"
-db_config_file = "/home/lgs17/infrastructure/infrastructure/bowker_config.txt"
+database_name = "database_name"
+db_config_file = "database_config.txt"
 
 
 if not os.path.isdir("cache_4"):

@@ -21,12 +21,12 @@ CREATE_TABLE_STMT = "CREATE TABLE expanded_url_map(expanded_url_0 TEXT, resolved
 INSERT_TWEET_STMT = "INSERT INTO expanded_url_map (expanded_url_0, resolved_url, domain) VALUES (%s, %s, %s);"
 
 
-database_name = "disinfo_2_qanon"
-db_config_file = "bowker_config.txt"
+database_name = "database_name"
+db_config_file = "database_config.txt"
 
 
-if not os.path.isdir("cache"):
-    os.makedirs("cache")
+if not os.path.isdir("cache_1"):
+    os.makedirs("cache_1")
 
 #############################
 ## URL expansion functions ##
@@ -127,18 +127,18 @@ short_urls = []
 
 # If there's no cached file, pull them from the database
 # Note: it's important that the URLs remain in the same order, which is why they're also sorted
-if not os.path.isfile("cache/distinct_urls_" + database_name + ".json"):
+if not os.path.isfile("cache_1/distinct_urls_" + database_name + ".json"):
     database, cursor = open_connection()
     cursor.execute("SELECT DISTINCT expanded_url_0 FROM tweets WHERE expanded_url_0 IS NOT NULL")
     short_urls = sorted([u[0] for u in cursor.fetchall()])
     close_connection(database, cursor)
 
-    with open("cache/distinct_urls_" + database_name + ".json", "w+") as f:
+    with open("cache_1/distinct_urls_" + database_name + ".json", "w+") as f:
         json.dump(short_urls, f)
 
 ## Otherwise we have a cached file of URLs already, so we can just use that
 else:
-    with open("cache/distinct_urls_" + database_name + ".json") as f:
+    with open("cache_1/distinct_urls_" + database_name + ".json") as f:
         short_urls = json.load(f)
 
 
@@ -170,12 +170,12 @@ def process_chunk(chunk):
     print("{}/{}".format(chunk_id, len(url_chunks)))
 
     ## Only expand the URLs if we haven't already expanded and cached them
-    if not os.path.isfile("cache/{}.json".format(chunk_id)):
+    if not os.path.isfile("cache_1/{}.json".format(chunk_id)):
 
         expanded_urls = [expand_url(short_url, short_url, url_timeout=60) for short_url in urls_to_expand]
 
         ## Cache the chunk so if something goes wrong later we don't have to expand everything again
-        with open("cache/{}.json".format(chunk_id), "w+") as f:
+        with open("cache_1/{}.json".format(chunk_id), "w+") as f:
             json.dump(expanded_urls, f)
 
 
@@ -191,12 +191,12 @@ pool.join()
 
 # Make sure we've got them all
 for chunk_id, _ in url_chunks:
-    assert os.path.isfile("cache/{}.json".format(chunk_id)), "No file exists for chunk {}".format(chunk_id)
+    assert os.path.isfile("cache_1/{}.json".format(chunk_id)), "No file exists for chunk {}".format(chunk_id)
 
 ## Compile all URL chunks into one big file
 compiled_urls = []
 for chunk_id, _ in url_chunks:
-    fname = "cache/{}.json".format(chunk_id)
+    fname = "cache_1/{}.json".format(chunk_id)
     with open(fname) as f:
         chunk_urls = json.load(f)
         compiled_urls.extend(chunk_urls)
