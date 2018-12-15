@@ -56,25 +56,25 @@ def pull_friends(api, user_ids):
 
 
 def write_friendships_to_database(configuration, friendships, start_interval, end_interval):
-#     config_file = configuration["db_config_file"]
-#     for line in open(db_config_file).readlines():
-#         key, value = line.strip().split("=")
-#         config[key] = value
+    config_file = configuration["db_config_file"]
+    event_id = configuration["event_id"]
     
-#     ## Connect to the database and get a cursor object
-#     database = psycopg2.connect(**config)
-#     cursor = database.cursor()
+    for line in open(db_config_file).readlines():
+        key, value = line.strip().split("=")
+        config[key] = value
+    
+    ## Connect to the database and get a cursor object
+    database = psycopg2.connect(**config)
+    cursor = database.cursor()
 
-#     cursor.execute(CREATE_TABLE_IF_EXISTS_STMT)
+    cursor.execute(CREATE_TABLE_IF_EXISTS_STMT)
     
-#     rows = []
+    rows = [friendship + (start_interval, end_interval, event_id)]
+    cursor.execute_many(INSERT_STMT, rows)
     
-#     database.commit()
-    
-#     with open("{start}_to_{end}.csv".format(start=str(start_interval), end=str(end_interval)), "w+") as f:
-#         writer = csv.writer(f)
-#         writer.writerow(["user_id", "friend_id", "friends_collected_at", "start_interval", "end_interval"])
-#         for friendship in friendships:
-#             writer.writerow(friendship + (start_interval, end_interval))
+    database.commit()
+    cursor.close()
+    database.close()
+
     print(friendships)
 
