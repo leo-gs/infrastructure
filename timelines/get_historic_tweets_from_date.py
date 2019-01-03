@@ -65,7 +65,7 @@ def get_historic_tweets_before_id(api, uid, max_id=None):
 		cursor_args["max_id"] = max_id
 
 	try:
-		for page in tweepy.Cursor(api.user_timeline, **cursor_args).pages(16):
+		for page in tweepy.Cursor(api.user_timeline, tweet_mode='extended', **cursor_args).pages(16):
 			## Adding the tweets to the list
 
 			json_tweets = [tweet._json for tweet in page]

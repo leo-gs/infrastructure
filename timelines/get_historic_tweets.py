@@ -48,7 +48,7 @@ def get_historic_tweets_from_id(uid,api):
 	## The timeline is returned as pages of tweets (each page has 20 tweets, starting with the 20 most recent)
 	## If a cap has been set and our list of tweets gets to be longer than the cap, we'll stop collecting
 	try:
-		for page in tweepy.Cursor(api.user_timeline, id=uid, count=200).pages():
+		for page in tweepy.Cursor(api.user_timeline, tweet_mode='extended', id=uid, count=200).pages():
 			tweets.extend(page)
 			if CAP and len(tweets) >= CAP:
 				return tweets
