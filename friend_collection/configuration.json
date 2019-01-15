@@ -1,9 +1,0 @@
-{
-  "collection_name": "very important data",
-  "data_dir": "data_folder",
-  "user_ids_csv": "user_ids.csv",
-  "twitter_config_file": "twitter_config.txt",
-  "db_config_file": "db_config.txt",
-  "progress_file": "progress.json",
-  "table_prefix": "very_important_data"
-}
