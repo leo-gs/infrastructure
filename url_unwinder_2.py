@@ -17,16 +17,15 @@ import time
 
 import sql_statements
 
-CREATE_TABLE_STMT = "CREATE TABLE expanded_url_map(expanded_url_0 TEXT, resolved_url TEXT, domain TEXT);"
-INSERT_TWEET_STMT = "INSERT INTO expanded_url_map (expanded_url_0, resolved_url, domain) VALUES (%s, %s, %s);"
+UPDATE_STMT = "UPDATE expanded_url_map SET resolved_url = %s, domain = %s WHERE expanded_url_0 = %s;"
 
 
-database_name = "disinfo_2_qanon"
-db_config_file = "bowker_config.txt"
+database_name = "database_name"
+db_config_file = "database_config.txt"
 
 
-if not os.path.isdir("cache"):
-    os.makedirs("cache")
+if not os.path.isdir("cache_2"):
+    os.makedirs("cache_2")
 
 #############################
 ## URL expansion functions ##
@@ -53,11 +52,11 @@ Logic:
 
 Returns: (original_url, expanded_url (or None), expanded_domain (or None))
 '''
-def expand_url(orig_url, short_url, url_timeout=60, domain_equivalence=False):
+def expand_url(orig_url, short_url, url_timeout=60, steps_remaining=25, domain_equivalence=False):
     
     short_domain = get_domain(short_url)
     if short_domain == "twitter.com":
-        return (short_url, short_url, short_domain)
+        return (short_url, short_domain, orig_url)
 
     expanded_url = None
     try:
@@ -69,35 +68,37 @@ def expand_url(orig_url, short_url, url_timeout=60, domain_equivalence=False):
 
     except requests.exceptions.ConnectionError:
         print("connection error: {}".format(short_url))
-        return (orig_url, None, None)
-
+        return (None, None, orig_url)
     except Exception as ex:
-        template = "An exception of type {0} occurred. Arguments:\n{1!r}"
-        message = template.format(type(ex).__name__, ex.args)
+        template = "An exception of type {0} occurred. URL: {1}"
+        message = template.format(type(ex).__name__, short_url)
         print(message)
-        return (orig_url, None, None)
-    
+        return (None, None, orig_url)
+
+
     ## We weren't able to expand the URL, so the URL is broken
     if not expanded_url:
-        return (orig_url, None, None)
+        return (None, None, orig_url)
 
     expanded_domain = get_domain(expanded_url)
 
     ## The expanded_url isn't valid
     if not expanded_domain:
-        return (orig_url, None, None)
+        return (None, None, orig_url)
 
     ## Expanding the URL took us to the same place, so it was already completely expanded
     if domain_equivalence:
         if short_domain == expanded_domain:
-            return (orig_url, short_url, short_domain)
+            return (short_url, short_domain, orig_url)
     else:
         if short_url == expanded_url:
-            return (orig_url, short_url, short_domain)
+            return (short_url, short_domain, orig_url)
     
     ## Otherwise, following the URL took us to a new URL or domain so start again with the new URL to see if there's more expansion to do
-    return expand_url(orig_url, expanded_url, url_timeout=url_timeout, domain_equivalence=domain_equivalence)
-
+    if steps_remaining > 0:
+        return expand_url(orig_url, expanded_url, url_timeout=url_timeout, steps_remaining=(steps_remaining-1), domain_equivalence=domain_equivalence)
+    else:
+        return (short_url, short_domain, orig_url)
 
 ########################
 ## Database functions ##
@@ -127,19 +128,21 @@ short_urls = []
 
 # If there's no cached file, pull them from the database
 # Note: it's important that the URLs remain in the same order, which is why they're also sorted
-if not os.path.isfile("cache/distinct_urls_" + database_name + ".json"):
+if not os.path.isfile("cache_2/distinct_urls_" + database_name + ".json"):
     database, cursor = open_connection()
-    cursor.execute("SELECT DISTINCT expanded_url_0 FROM tweets WHERE expanded_url_0 IS NOT NULL")
+    cursor.execute("SELECT  expanded_url_0 FROM expanded_url_map WHERE domain IS NULL")
     short_urls = sorted([u[0] for u in cursor.fetchall()])
     close_connection(database, cursor)
 
-    with open("cache/distinct_urls_" + database_name + ".json", "w+") as f:
+    with open("cache_2/distinct_urls_" + database_name + ".json", "w+") as f:
         json.dump(short_urls, f)
 
 ## Otherwise we have a cached file of URLs already, so we can just use that
 else:
-    with open("cache/distinct_urls_" + database_name + ".json") as f:
+    with open("cache_2/distinct_urls_" + database_name + ".json") as f:
         short_urls = json.load(f)
+
+print("{} URLs pulled".format(len(short_urls)), flush=True)
 
 
 ##########################################################################
@@ -148,10 +151,6 @@ else:
 
 chunk_size = 1000 ## how many URLs per chunk - can be adjusted
 url_chunks = []
-
-## delete this!
-chunk_size = 10
-short_urls = short_urls[:500]
 
 index = 0
 while index < len(short_urls):
@@ -167,15 +166,15 @@ while index < len(short_urls):
 
 def process_chunk(chunk):
     chunk_id, urls_to_expand = chunk
-    print("{}/{}".format(chunk_id, len(url_chunks)))
+    print("{}/{}".format(chunk_id, len(url_chunks)), flush=True)
 
     ## Only expand the URLs if we haven't already expanded and cached them
-    if not os.path.isfile("cache/{}.json".format(chunk_id)):
+    if not os.path.isfile("cache_2/{}.json".format(chunk_id)):
 
-        expanded_urls = [expand_url(short_url, short_url, url_timeout=60) for short_url in urls_to_expand]
+        expanded_urls = [expand_url(short_url, short_url, url_timeout=120, steps_remaining=100) for short_url in urls_to_expand]
 
         ## Cache the chunk so if something goes wrong later we don't have to expand everything again
-        with open("cache/{}.json".format(chunk_id), "w+") as f:
+        with open("cache_2/{}.json".format(chunk_id), "w+") as f:
             json.dump(expanded_urls, f)
 
 
@@ -184,6 +183,8 @@ _ = pool.map_async(process_chunk, url_chunks)
 pool.close()
 pool.join()
 
+print("Finished processing URLs", flush=True)
+
 
 ###############################
 ## 4. Compile all URL chunks ##
@@ -191,15 +192,18 @@ pool.join()
 
 # Make sure we've got them all
 for chunk_id, _ in url_chunks:
-    assert os.path.isfile("cache/{}.json".format(chunk_id)), "No file exists for chunk {}".format(chunk_id)
+    assert os.path.isfile("cache_2/{}.json".format(chunk_id)), "No file exists for chunk {}".format(chunk_id)
 
 ## Compile all URL chunks into one big file
 compiled_urls = []
 for chunk_id, _ in url_chunks:
-    fname = "cache/{}.json".format(chunk_id)
+    fname = "cache_2/{}.json".format(chunk_id)
+    print(fname, flush=True)
     with open(fname) as f:
         chunk_urls = json.load(f)
         compiled_urls.extend(chunk_urls)
+compiled_urls = [c for c in compiled_urls if c[1]] # No need to update if resolving the URL wasn't successful
+print("Finished compiling {} URLs".format(len(compiled_urls)), flush=True)
 
 
 ###############################
@@ -207,13 +211,14 @@ for chunk_id, _ in url_chunks:
 ###############################
 
 database, cursor = open_connection()
-ext.execute_batch(cursor, INSERT_TWEET_STMT, compiled_urls)
+ext.execute_batch(cursor, UPDATE_STMT, compiled_urls)
 close_connection(database, cursor)
 
+print("Updated database", flush=True)
 
 ##############
 ## 6. Done! ##
 ##############
 
-print("Done")
+print("Done!")
 
