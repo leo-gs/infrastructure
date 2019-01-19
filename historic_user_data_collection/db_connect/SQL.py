@@ -1,6 +1,8 @@
 user_set_configuration_create = """
     CREATE TABLE IF NOT EXISTS user_set_configuration (
         user_set_id SERIAL PRIMARY KEY UNIQUE,
+        db_credentials_fpath TEXT,
+        twitter_credential_fpath TEXT,
         user_set_name TEXT,
         user_set_creation_ts TIMESTAMP,
         user_set_input_collection TEXT,
@@ -11,13 +13,15 @@ user_set_configuration_create = """
         user_set_user_filter_args JSON,
         user_set_collection_modules_to_run JSON,
         notifier_params JSON,
-        automatic_launch BOOL,
         run_flags JSON,
+        day_interval INT,
         extra_params JSON )
         """
 
 user_set_configuration_insert = """
     INSERT INTO user_set_configuration (
+        db_credentials_fpath,
+        twitter_credential_fpath,
         user_set_name,
         user_set_creation_ts,
         user_set_input_collection,
@@ -28,16 +32,19 @@ user_set_configuration_insert = """
         user_set_user_filter_args,
         user_set_collection_modules_to_run,
         notifier_params,
-        automatic_launch,
         run_flags,
+        day_interval,
         extra_params
-    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     RETURNING user_set_id
     """
 
 user_set_configuration_update = """
     UPDATE user_set_configuration
-    SET user_set_input_collection = %s,
+    SET db_credentials_fpath = %s,
+        twitter_credential_fpath = %s,
+        user_set_name = %s,
+        user_set_input_collection = %s,
         user_set_input_collection_fpaths = %s,
         user_set_description = %s,
         user_set_notes = %s,
@@ -46,6 +53,7 @@ user_set_configuration_update = """
         user_set_collection_modules_to_run = %s,
         notifier_params = %s,
         run_flags = %s,
+        day_interval = %s,
         extra_params = %s
     WHERE user_set_id = %s
     """

@@ -13,6 +13,7 @@ class Friends(collection.Collection):
     def __init__(self, user_set_id, user_set_prefix, db,
                  notifiers=[]):
         self.user_set_id = user_set_id
+        self.name = "friends"
         self.user_set_prefix = user_set_prefix
         self.db = db
         self.notifiers = notifiers
@@ -79,13 +80,3 @@ class Friends(collection.Collection):
         notifications.notify_all(self.notifiers, "Finished collecting friends for {} user_ids".format(len(user_ids)), notify_type="complete")
 
         return friendships
-
-    def upload_data(self, data):
-        # process data into rows here
-        self.db.execute_sql(self.table_insert, data, commit=True,
-                                  batch_insert=True)
-        notifications.notify_all(self.notifiers, "Uploaded {} rows to {}".format(
-            len(data), self.table_name))
-
-    def get_name(self):
-        return "friends"

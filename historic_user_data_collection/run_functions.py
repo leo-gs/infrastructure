@@ -10,13 +10,14 @@ from db_connect import database, SQL
 from utilities import notifications, user_set_config, setup
 
 
-
-def start_collection(postgres_credential_fpath, config_fpath):
+def initialize_collection(config_fpath):
 
     """ Setting things up """
 
     with open(config_fpath) as f:
         config = json.load(f)
+
+    db_credentials_fpath = config["db_credentials_fpath"]
 
     ## Name of database (should already exist)
     db_name = config["database_name"]
@@ -27,7 +28,7 @@ def start_collection(postgres_credential_fpath, config_fpath):
     notifiers = [notifications.TestNotification()]
 
     # Prepare server (Step 0)
-    db_creds = credentials.read_credential_file(postgres_credential_fpath)
+    db_creds = credentials.read_credential_file(db_credentials_fpath)
     host, user, password = db_creds["host"], db_creds["user"], db_creds["password"]
     db = setup.server_setup(host, user, password, db_name, notifiers)
 
@@ -39,16 +40,18 @@ def start_collection(postgres_credential_fpath, config_fpath):
     config["database_name"] = db_name
     config["user_set_id"] = user_set_id
     with open(config_fpath, "w+") as f:
-        json.dump(config, f)
+        json.dump(config, f, sort_keys=True, indent=4)
 
 
-def run_collection(postgres_credential_fpath, twitter_credential_fpath, config_fpath):
-
-
-    """ Setting things up """
+def run_collection(config_fpath):
 
     with open(config_fpath) as f:
         config = json.load(f)
+
+    """ Setting things up """
+
+    db_credentials_fpath = config["db_credentials_fpath"]
+    twitter_credential_fpath = config["twitter_credential_fpath"]
 
     # ID of historic collection in database
     user_set_id = config["user_set_id"]
@@ -62,8 +65,9 @@ def run_collection(postgres_credential_fpath, twitter_credential_fpath, config_f
     notifiers = [notifications.TestNotification()]
 
     # Prepare server (Step 0)
-    db_creds = credentials.read_credential_file(postgres_credential_fpath)
+    db_creds = credentials.read_credential_file(db_credentials_fpath)
     host, user, password = db_creds["host"], db_creds["user"], db_creds["password"]
+
     db = setup.server_setup(host, user, password, db_name, notifiers)
 
     user_set_config.update_user_set_config_entry_in_db(
@@ -83,34 +87,23 @@ def run_collection(postgres_credential_fpath, twitter_credential_fpath, config_f
     ## Shuffle the list so collection is run on a different order each time.
     shuffle(user_ids)
 
-    usc.collect_and_upload(twitter_api, user_ids)
+    usc.collect_and_upload(twitter_api, user_ids, notifiers)
 
 
-def schedule_cron_job(postgres_credential_fpath, twitter_credential_fpath, config_fpath, every_x_days=14):
+def schedule_cron_job(config_fpath, every_x_days=10):
 
-    # cron_command = '''python3 run_collection.py "{}" "{}" "{}"'''.format(postgres_credential_fpath, twitter_credential_fpath, config_fpath)
-    #
-    # cron  = CronTab(user=True)
-    # cronjob = cron.new(command=cron_command)
-    #
-    # cronjob.day.every(every_x_days)
-    #
-    # cron.write()
+    cron_command = '''python3 /home/lgs17/infrastructure/historic_user_data_collection/run_functions.py "{}"'''.format(config_fpath)
 
-    cron_command = """echo 'running a job'"""
-
-    cron  = CronTab(user=True)
+    cron = CronTab(user=True)
     cronjob = cron.new(command=cron_command)
 
-    cronjob.minute.every(2)
+    cronjob.day.every(every_x_days)
 
     cron.write()
 
+    print("Running every {} days: `{}`".format(every_x_days, cron_command), flush=True)
 
 
 if __name__ == "__main__":
-    postgres_credential_fpath = sys.argv[1]
-    twitter_credential_fpath = sys.argv[2]
-    config_fpath = sys.argv[3]
-
-    run_collection(postgres_credential_fpath, twitter_credential_fpath, config_fpath)
+    config_fpath = sys.argv[1]
+    run_collection(config_fpath)

@@ -1,12 +1,11 @@
 import psycopg2
 from psycopg2 import extras as ext
-from utilities import notifications
 
 
 class Database:
 
     def __init__(self, host, user, password, db_name,
-                 create_if_not_exists=False, notifiers=[]):
+                 create_if_not_exists=False):
 
         self.host = host
         self.user = user
@@ -32,14 +31,9 @@ class Database:
         cursor.close()
         db_conn.close()
 
-        notifications.notify_all(notifiers, "Database `{}` already exists? {}"
-                        .format(db_name, db_exists), notify_type="info")
-
+	
         if not db_exists:
             if create_if_not_exists:
-                notifications.notify_all(notifiers, "Creating database {}....".format(db_name,
-                                notify_type="start"))
-
                 db_conn=psycopg2.connect(connection_str)
                 db_conn.set_isolation_level(
                     psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
@@ -50,8 +44,6 @@ class Database:
                 db_conn.commit()
                 cursor.close()
                 db_conn.close()
-
-                notifications.notify_all(notifiers, "Done creating database `{}`".format(db_name), notify_type="complete")
 
             else:
                 raise ValueError("The database {} doesn't exist. If you want"

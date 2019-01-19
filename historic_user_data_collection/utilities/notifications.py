@@ -46,27 +46,3 @@ def get_notifiers(config):
 def notify_all(notifiers, message, notify_type="info"):
     for notifier in notifiers:
         notifier.notify(message, notify_type)
-
-# """
-# Slack notifications.
-# """
-# class SlackNotification:
-#
-#     def __init__(self, channel, bot_token):
-#         self.channel = channel
-#         self.bot_token = bot_token
-#
-#
-#     def notify(self, message):
-#         from slackclient import SlackClient
-#         slack_client = SlackClient(self.bot_token)
-#
-#         slack_client.api_call(
-#             "chat.postEphemeral",
-#             channel="#leos_test_channel",
-#             text="🚨 INCOMING NOTIFICATION 🚨 {}".format(message),
-#         )
-#
-# bot_token = "xoxb-6008658867-505420171330-geJNN0CIJCNJVZXk2YuuQqlR"
-# n = SlackNotification(None)
-# n.notify("beep boop")

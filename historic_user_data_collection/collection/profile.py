@@ -15,6 +15,7 @@ class Profile(collection.Collection):
     def __init__(self, user_set_id, user_set_prefix, db,
                  notifiers=[]):
         self.user_set_id = user_set_id
+        self.name = "user_profile"
         self.user_set_prefix = user_set_prefix
         self.db = db
         self.notifiers = notifiers
@@ -57,16 +58,6 @@ class Profile(collection.Collection):
 
         return all_rows
 
-    def upload_data(self, data):
-        notifications.notify_all(self.notifiers, "Starting profile data upload for {} rows".format(len(data)), notify_type="start")
-
-        self.db.execute_sql(sql=self.table_insert, args=data, commit=True,
-                                  batch_insert=True)
-        notifications.notify_all(self.notifiers, "Uploaded {} rows to {}".format(
-            len(data), self.table_name), notify_type="complete")
-
-    def get_name(self):
-        return "user_profile"
 
 def pull_user_data(api, user_id_chunk, user_set_id, collection_bucket_ts):
     if len(user_id_chunk) > 100:

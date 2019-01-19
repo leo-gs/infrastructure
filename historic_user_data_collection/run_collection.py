@@ -1,12 +1,18 @@
+import json
+import sys
+
 import run_functions as rf
 
-""" Setting parameters """
 
-# Postgres Credentials
-postgres_credential_fpath = "credentials/techne.creds"
-twitter_credential_fpath = "credentials/twitter.creds"
-config_fpath = "alaska_earthquake.config"
+if __name__ == "__main__":
+    config_fpath = sys.argv[1]
 
-rf.start_collection(postgres_credential_fpath, config_fpath)
-rf.schedule_cron_job(postgres_credential_fpath, twitter_credential_fpath, config_fpath)
-rf.run_collection(postgres_credential_fpath, twitter_credential_fpath, config_fpath)
+    with open(config_fpath) as f:
+        config = json.load(f)
+
+    if "user_set_id" not in config:
+        rf.initialize_collection(config_fpath)
+
+    day_interval = config["day_interval"]
+    rf.schedule_cron_job(config_fpath, every_x_days=day_interval)
+    rf.run_collection(config_fpath)

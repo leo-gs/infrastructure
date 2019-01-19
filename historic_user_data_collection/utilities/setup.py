@@ -1,6 +1,6 @@
 from collection import *
 from db_connect import database, SQL
-from utilities import notifications, user_set_config
+from utilities import notifications
 from userids import userscsv
 
 def server_setup(host, user, password, db_name, notifiers):
@@ -10,7 +10,7 @@ def server_setup(host, user, password, db_name, notifiers):
 
     try:
         db = database.Database(host, user, password, db_name,
-                            create_if_not_exists=True, notifiers=notifiers)
+                            create_if_not_exists=True)
 
         # Create the tables if they don't exist
         db.execute_sql(SQL.user_set_configuration_create, commit=True)

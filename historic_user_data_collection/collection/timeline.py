@@ -17,6 +17,7 @@ class Timeline(collection.Collection):
             raise ValueError("Please specify `timebound_type` to be 'number', 'date', or 'last_tweet'")
 
         self.user_set_id = user_set_id
+        self.name = "timeline"
         self.user_set_prefix = user_set_prefix
         self.db = db
         self.notifiers = notifiers
@@ -113,17 +114,6 @@ class Timeline(collection.Collection):
         notifications.notify_all(self.notifiers, "Finished collecting timelines for {} user_ids".format(len(user_ids)), notify_type="complete")
 
         return all_rows
-
-    def upload_data(self, data):
-        notifications.notify_all(self.notifiers, "Starting timeline upload for {} rows".format(len(data)), notify_type="start")
-
-        self.db.execute_sql(sql=self.table_insert, args=data, commit=True, batch_insert=True)
-
-        notifications.notify_all(self.notifiers, "Uploaded {} rows to {}".format(
-            len(data), self.table_name), notify_type="complete")
-
-    def get_name(self):
-        return "timeline"
 
 
     ## Gets 3200 of the most recent tweets associated with the given uid before before_id (or the 3200 most recent tweets if before_id is None)
