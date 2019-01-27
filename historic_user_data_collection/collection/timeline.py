@@ -22,7 +22,7 @@ class Timeline(collection.Collection):
         self.db = db
         self.notifiers = notifiers
 
-        self.table_name = "{}_user_timeline".format(user_set_prefix)
+        self.table_name = "{}_timeline".format(user_set_prefix)
 
         table_create = """
             CREATE TABLE IF NOT EXISTS {} (
