@@ -91,8 +91,9 @@ def run_collection(config_fpath):
 
 
 def schedule_cron_job(config_fpath, every_x_days=10):
+    working_dir = os.path.abspath(".")
 
-    cron_command = '''python3 /home/lgs17/infrastructure/historic_user_data_collection/run_functions.py "{}"'''.format(config_fpath)
+    cron_command = '''python3 {}/run_functions.py "{}"'''.format(working_dir, config_fpath)
 
     cron = CronTab(user=True)
     cronjob = cron.new(command=cron_command)
