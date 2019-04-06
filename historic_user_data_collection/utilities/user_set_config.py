@@ -48,9 +48,22 @@ class UserSetConfig:
         collection_bucket_start_ts = datetime.now()
 
         for module in self.collection_modules:
-            collected_data = module.collect(api, user_ids, collection_bucket_start_ts)
-            module.upload_data(collected_data)
-            module.dump_data(collected_data, self.user_set_name, collection_bucket_start_ts)
+            chunk_size = 100
+            chunk_id_padding_length = len(str(len(user_ids) // chunk_size))
+
+            for i, chunk_start in enumerate(range(0, len(user_ids), chunk_size)):
+
+                print("progress=" + str(int(100*(float(chunk_start)/float(len(user_ids))))))
+
+                chunk_end = chunk_start + chunk_size
+                user_id_chunk = user_ids[chunk_start : chunk_end]
+
+                chunk_str_id = str(i).zfill(chunk_id_padding_length)
+
+                collected_data = module.collect(api, user_id_chunk, collection_bucket_start_ts)
+
+                module.upload_data(collected_data)
+                module.dump_data(collected_data, self.user_set_name, collection_bucket_start_ts, chunk_str_id)
 
         collection_bucket_end_ts = datetime.now()
 

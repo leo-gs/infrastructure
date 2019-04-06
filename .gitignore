@@ -45,4 +45,6 @@ Thumbs.db
 *.creds
 *.config
 *.csv
+*.err
+*.out
 

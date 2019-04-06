@@ -28,16 +28,17 @@ class Collection:
         notifications.notify_all(self.notifiers, "Uploaded {} rows to {}".format(len(data), self.table_name), notify_type="complete")
 
 
-    def dump_data(self, data, user_set_name, ts):
+    def dump_data(self, data, user_set_name, collection_ts, chunk_str_id):
         if not os.path.isdir("/data/historic_twitter_data"):
             raise RuntimeError("`/data/historic_twitter_data` must exist and be writable for JSON dumps")
 
         collection_name = self.name
+
         table_name = self.table_name
-        ts_name = ts.strftime("%Y%m%d_%H%M")
+        collection_ts_name = collection_ts.strftime("%Y%m%d_%H%M%S")
 
         data_dir = "/data/historic_twitter_data/{}/{}".format(user_set_name, collection_name)
-        data_file = "{}_{}.json".format(table_name, ts_name)
+        data_file = "{}_{}_{}.json".format(table_name, ts_name, chunk_str_id)
 
         os.makedirs(data_dir, exist_ok=True)
 
